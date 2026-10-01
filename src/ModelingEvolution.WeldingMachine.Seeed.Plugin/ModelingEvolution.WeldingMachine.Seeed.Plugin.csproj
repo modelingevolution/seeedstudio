@@ -1,0 +1,52 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <!--
+    The only package this repository publishes. Mirrors ModelingEvolution.WeldingMachine.FairinoDo.Plugin
+    (fairino repo) on every host-loading rule:
+
+    - Microsoft.NET.Sdk.Razor for GenericSeeedWelderView, with NO scoped CSS and NO static web assets:
+      rw2's PluginStager copies only .dll/.pdb out of lib/<tfm>/, so either would never be staged.
+    - PackageId == AssemblyName: PluginStager hard-fails unless <PackageId>.dll is present.
+    - Every ConfigProperty type lives in THIS assembly: rw2 calls
+      ConfigPropertyJsonConverter.ScanAssembly(plugin.GetType().Assembly) and scans nothing else.
+
+    No native dependency: GPIO is driven through the kernel's GPIO v2 character-device ioctls directly
+    (Gpio/GpioV2Native.cs), so the rw2 image needs no libgpiod.
+  -->
+  <PropertyGroup>
+    <RootNamespace>ModelingEvolution.WeldingMachine.Seeed.Plugin</RootNamespace>
+    <AssemblyName>ModelingEvolution.WeldingMachine.Seeed.Plugin</AssemblyName>
+    <PackageId>ModelingEvolution.WeldingMachine.Seeed.Plugin</PackageId>
+    <IsPackable>true</IsPackable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);NU1510;CS1591</NoWarn>
+    <Description>RocketWelder device plugin for a welding machine (e.g. a plasma cutter) whose only control input is a start contact, driven from one isolated digital output (DO1-DO4) of a Seeed reComputer/reServer Industrial (Jetson, JetPack 6).</Description>
+    <PackageTags>rocketwelder;plugin;devices;welding;seeed;recomputer;gpio;digital-output</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" Link="README.md" />
+    <SupportedPlatform Include="browser" />
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Same versions as the FairinoDo plugin. The "RocketWelder.SDK" prefix is host-shared, so the
+         host's copy wins in the staged closure whatever is written here. -->
+    <PackageReference Include="RocketWelder.SDK.Abstractions" Version="2.18.0" />
+    <PackageReference Include="RocketWelder.SDK.Automation.Abstractions" Version="2.18.0" />
+    <PackageReference Include="RocketWelder.SDK.Devices.Welding" Version="2.17.0" />
+    <PackageReference Include="ModelingEvolution.Signals" Version="2.0.1.1" />
+    <PackageReference Include="ModelingEvolution.Drawing" Version="1.13.0.71" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.8" />
+    <PackageReference Include="MudBlazor" Version="9.4.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="ModelingEvolution.WeldingMachine.Seeed.Plugin.Tests" />
+    <InternalsVisibleTo Include="SeeedDoProbe" />
+  </ItemGroup>
+
+</Project>

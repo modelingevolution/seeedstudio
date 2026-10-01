@@ -1,0 +1,81 @@
+# Publishes ModelingEvolution.WeldingMachine.Seeed.Plugin to the ModelingEvolution feed on a vX.Y.Z tag.
+#
+# SELF-HOSTED x64 runner: the repository is private (GitHub-hosted minutes are billing-blocked) and
+# nuget.modelingevolution.com has no public ingress. The runner has no sudo, so the SDK installs into
+# runner.temp — DOTNET_INSTALL_DIR must be on the setup step, not the job (the `runner` context is not
+# available in jobs.<id>.env). Internal-only: no nuget.org step, and the push is NOT continue-on-error.
+name: Publish to NuGet
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish'
+        required: true
+
+jobs:
+  plugin:
+    runs-on: [self-hosted, x64]
+    timeout-minutes: 30
+    env:
+      PLUGIN_CSPROJ: src/ModelingEvolution.WeldingMachine.Seeed.Plugin/ModelingEvolution.WeldingMachine.Seeed.Plugin.csproj
+      TESTS_CSPROJ: src/ModelingEvolution.WeldingMachine.Seeed.Plugin.Tests/ModelingEvolution.WeldingMachine.Seeed.Plugin.Tests.csproj
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+        env:
+          DOTNET_INSTALL_DIR: ${{ runner.temp }}/dotnet
+
+      - name: Version
+        id: ver
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/v}"
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Publishing $VERSION"
+
+      - name: Restore
+        run: |
+          dotnet restore "$PLUGIN_CSPROJ"
+          dotnet restore "$TESTS_CSPROJ"
+
+      - name: Build
+        run: dotnet build "$TESTS_CSPROJ" -c Release --no-restore -p:Version=${{ steps.ver.outputs.version }}
+
+      - name: Test (hardware-free)
+        run: dotnet test "$TESTS_CSPROJ" -c Release --no-build --filter "Category!=Hardware"
+
+      - name: Pack
+        run: dotnet pack "$PLUGIN_CSPROJ" -c Release --no-build --output ./nupkg -p:Version=${{ steps.ver.outputs.version }}
+
+      # PluginStager hard-fails unless <PackageId>.dll is in lib/<tfm>/ — check it before the push.
+      - name: Verify the package
+        run: |
+          PKG=./nupkg/ModelingEvolution.WeldingMachine.Seeed.Plugin.${{ steps.ver.outputs.version }}.nupkg
+          test -f "$PKG" || { echo "::error::$PKG not packed"; ls -la ./nupkg; exit 1; }
+          unzip -l "$PKG" | grep -q "lib/net10.0/ModelingEvolution.WeldingMachine.Seeed.Plugin.dll" \
+            || { echo "::error::plugin dll missing from lib/net10.0"; unzip -l "$PKG"; exit 1; }
+
+      - name: Push to the ModelingEvolution feed
+        id: push
+        run: >
+          dotnet nuget push ./nupkg/*.nupkg
+          --api-key ${{ secrets.NUGET_API_KEY_ME }}
+          --source https://nuget.modelingevolution.com/v3/index.json
+          --timeout 60
+          --skip-duplicate
+
+      - name: Verify the package is fetchable from the feed
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+          PUSH_OUTCOME: ${{ steps.push.outcome }}
+        run: bash ci/verify-feed.sh

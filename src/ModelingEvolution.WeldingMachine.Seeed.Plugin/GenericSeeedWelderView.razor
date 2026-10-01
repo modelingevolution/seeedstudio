@@ -1,0 +1,51 @@
+@*
+    The device's detail panel. READ-ONLY, and with no manual output toggle on purpose: a hand-operated
+    arc-on from a status panel would start the welder from a screen nobody is standing at.
+    NO scoped CSS / static assets — rw2's PluginStager stages only .dll/.pdb.
+    It reads cached fields only; IsConnected is polled by the host, never from this circuit.
+*@
+@implements IDisposable
+
+<MudPaper Class="pa-4" Elevation="0">
+    <MudText Typo="Typo.h6" GutterBottom="true">Seeed digital output</MudText>
+
+    @if (_machine is null)
+    {
+        <MudAlert Severity="Severity.Warning" Dense="true">Unknown device.</MudAlert>
+    }
+    else
+    {
+        <MudSimpleTable Dense="true" Hover="true" Striped="true">
+            <tbody>
+                <tr><td style="width: 45%">Connection</td><td><b>@_machine.LastKnownState</b></td></tr>
+                <tr><td>Terminal</td><td><b>@_machine.Output.Terminal</b> (@_machine.Output.LineName)</td></tr>
+                <tr><td>GPIO line</td><td><b>@(_machine.Location ?? "—")</b></td></tr>
+                <tr><td>Output (read-back)</td><td><b>@(_machine.LastReadBack switch { true => "ON", false => "OFF", null => "—" })</b></td></tr>
+            </tbody>
+        </MudSimpleTable>
+
+        @if (!string.IsNullOrWhiteSpace(_machine.LastKnownProblem))
+        {
+            <MudAlert Severity="Severity.Error" Dense="true" Class="mt-4"><b>Problem:</b> @_machine.LastKnownProblem</MudAlert>
+        }
+
+        <MudText Typo="Typo.caption" Class="mt-4 d-block">
+            Read-back is the GPIO controller's output register: it proves the pin is driven, not that the relay closed or an arc exists.
+        </MudText>
+    }
+</MudPaper>
+
+@code {
+    private GenericSeeedWelder? _machine;
+    private Timer? _timer;
+
+    /// <summary>The device, handed in by the host's DynamicComponent seam.</summary>
+    [Parameter] public object? Device { get; set; }
+
+    protected override void OnParametersSet() => _machine = Device as GenericSeeedWelder;
+
+    protected override void OnInitialized() =>
+        _timer = new Timer(_ => InvokeAsync(StateHasChanged), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+
+    public void Dispose() => _timer?.Dispose();
+}

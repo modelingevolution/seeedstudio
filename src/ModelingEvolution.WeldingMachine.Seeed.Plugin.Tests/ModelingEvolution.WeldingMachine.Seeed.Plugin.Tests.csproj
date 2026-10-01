@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Hardware-free: every test runs with a fake output, except the [Trait("Category","Hardware")]
+       ones, which need a Seeed board and are excluded from the release gate. -->
+  <PropertyGroup>
+    <RootNamespace>ModelingEvolution.WeldingMachine.Seeed.Plugin.Tests</RootNamespace>
+    <AssemblyName>ModelingEvolution.WeldingMachine.Seeed.Plugin.Tests</AssemblyName>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FluentAssertions" Version="6.12.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="NSubstitute" Version="5.1.0" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.8" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ModelingEvolution.WeldingMachine.Seeed.Plugin\ModelingEvolution.WeldingMachine.Seeed.Plugin.csproj" />
+  </ItemGroup>
+
+</Project>
