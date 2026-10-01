@@ -34,11 +34,18 @@ jobs:
 
       # The runner's /usr/lib/dotnet (SDK 8) can still win on PATH; v1.0.0's first run restored with it and
       # failed NETSDK1045. Put the SDK setup-dotnet installed first, and say which one is used.
-      - name: Use the installed .NET 10 SDK
+      # setup-dotnet can report "already installed" for an SDK that lives in another dotnet root on this
+      # runner, so find the root that really has a 10.x SDK rather than assuming a path.
+      - name: Use a .NET 10 SDK
         run: |
-          echo "${{ runner.temp }}/dotnet" >> "$GITHUB_PATH"
-          echo "DOTNET_ROOT=${{ runner.temp }}/dotnet" >> "$GITHUB_ENV"
-          "${{ runner.temp }}/dotnet/dotnet" --version
+          for root in "${{ runner.temp }}/dotnet" "$DOTNET_ROOT" "$HOME/.dotnet" /usr/share/dotnet /usr/lib/dotnet /opt/dotnet; do
+            [ -x "$root/dotnet" ] || continue
+            if "$root/dotnet" --list-sdks 2>/dev/null | grep -q '^10\.'; then
+              echo "Using $root"; "$root/dotnet" --list-sdks | grep '^10\.'
+              echo "$root" >> "$GITHUB_PATH"; echo "DOTNET_ROOT=$root" >> "$GITHUB_ENV"; exit 0
+            fi
+          done
+          echo "::error::No .NET 10 SDK on this runner"; exit 1
 
       - name: Version
         id: ver
