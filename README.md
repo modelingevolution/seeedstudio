@@ -15,6 +15,52 @@ the write is a local ioctl on `/dev/gpiochip0`, followed by a read-back.
 |---|---|
 | `SeeedDoOutput` | **1–4** = terminal **DO1–DO4**. Required, no default — read it off the cabinet wiring. |
 
+### How to connect
+
+**1. Find the terminal block.** The green 16-pin DI/DO/CAN block on the front panel, under the USB ports.
+The reComputer Industrial and the reServer Industrial J4012 use the same block and the same pin-out.
+
+![reComputer Industrial — the green DI/DO/CAN terminal block](docs/images/recomputer-industrial-interfaces.png)
+
+**2. Pin-out.** Top row: DI1–DI4, DO1–DO4. Bottom row: GND_DI, GND_DO, then CAN (CG/CH/CL).
+
+![DI/DO terminal pin-out](docs/images/dido-terminal-pinout.png)
+
+| Pin (Seeed numbering) | Label | Use here |
+|---|---|---|
+| 9 / 11 / 13 / 15 (top row, columns 5–8) | **DO1 / DO2 / DO3 / DO4** | the output — configure the same number in rw2 |
+| 8 / 10 (bottom row, under DI4 and DO1) | **GND_DO** | 0 V of the external supply that powers the load |
+| 1 / 3 / 5 / 7 | DI1–DI4 | not used by this plugin (12 V inputs) |
+| 2 / 4 / 6 | GND_DI | not used |
+| 12 / 14 / 16 | CG / CH / CL | CAN — not used |
+
+**3. Wiring (Seeed's reference).** Each DO is an isolated, open-collector **sink**: the load sits between
+the external +V (max 40 V) and DOx, and GND_DO goes to that supply's 0 V. Max **40 mA** per output.
+
+![DO wiring — Seeed reference](docs/images/do-wiring-seeed.png)
+
+**4. Wiring a plasma / welder start contact.** The output cannot switch the start circuit directly —
+drive an **interface relay or SSR** and let its contact close the welder's start input (the contact a
+Fairino control-box DO switches today).
+
+```
+   cabinet +24 V ──────────────┐
+                               │
+                        ┌──────┴──────┐  interface relay / SSR input
+                        │  A1     (+) │  coil/input current ≤ 40 mA (aim < 20 mA)
+                        │  A2     (−) │  flyback diode across the coil if the
+                        └──────┬──────┘  relay module does not have one
+                               │
+   Seeed terminal  DO1 (pin 9) ┘
+   Seeed terminal  GND_DO (pin 8 or 10) ──── cabinet 0 V (of the same 24 V supply)
+
+   relay contact (COM / NO) ──── welder / plasma START input  (dry contact, as wired to the Fairino DO before)
+   ideally in series with the E-stop / safety chain — see "Safe state" below
+```
+
+Configure **SeeedDoOutput = 1** for DO1 (2 for DO2, …). Check with a meter before the welder is connected:
+with rw2 running the output is OFF; an ArcOn step closes the relay.
+
 ### Terminals → Jetson pins
 
 Both carriers wire the DO terminals to the same pins (Seeed wiki, "Hardware and Interfaces Usage" for each
@@ -82,3 +128,9 @@ sudo cat /sys/kernel/debug/gpio | grep PI.00   # independent view: "rw2 DO1 ) ou
 ```
 
 Do not run it while rw2 holds the same terminal — the request fails with "already held", by design.
+
+---
+
+Images in `docs/images/` are from the Seeed Studio wiki
+([reComputer Industrial J40/J30 Hardware and Interfaces Usage](https://wiki.seeedstudio.com/reComputer_Industrial_J40_J30_Hardware_Interfaces_Usage/),
+[reServer Industrial Hardware Interface Usage](https://wiki.seeedstudio.com/reserver_industrial_hardware_interface_usage/)), © Seeed Studio.
