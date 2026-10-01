@@ -50,7 +50,14 @@ jobs:
               echo "$root" >> "$GITHUB_PATH"; echo "DOTNET_ROOT=$root" >> "$GITHUB_ENV"; exit 0
             fi
           done
-          echo "::error::No .NET 10 SDK on this runner"; exit 1
+          # tycho: setup-dotnet found sdk/10.0.401 in runner.temp but installs with --skip-non-versioned-files,
+          # so that root had no `dotnet` executable (v1.0.1's first run). Install a complete SDK, muxer
+          # included, into a persistent per-user directory — no sudo, reused by later runs.
+          root="$HOME/.dotnet-ci"
+          curl -sSL https://dot.net/v1/dotnet-install.sh -o "$RUNNER_TEMP/dotnet-install.sh"
+          bash "$RUNNER_TEMP/dotnet-install.sh" --channel 10.0 --install-dir "$root"
+          "$root/dotnet" --list-sdks | grep -q '^10\.' || { echo "::error::No .NET 10 SDK on this runner"; exit 1; }
+          echo "Using $root (installed)"; echo "$root" >> "$GITHUB_PATH"; echo "DOTNET_ROOT=$root" >> "$GITHUB_ENV"
 
       - name: Version
         id: ver
