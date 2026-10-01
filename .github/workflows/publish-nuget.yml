@@ -1,9 +1,9 @@
-# Publishes ModelingEvolution.WeldingMachine.Seeed.Plugin to the ModelingEvolution feed on a vX.Y.Z tag.
+# Publishes ModelingEvolution.WeldingMachine.Seeed.Plugin to the ModelingEvolution feed AND nuget.org on a vX.Y.Z tag.
 #
-# SELF-HOSTED x64 runner: the repository is private (GitHub-hosted minutes are billing-blocked) and
-# nuget.modelingevolution.com has no public ingress. The runner has no sudo, so the SDK installs into
+# SELF-HOSTED x64 runner (the org runner group allows public repos since 2026-10-01): GitHub-hosted runners
+# cannot reach nuget.modelingevolution.com. The runner has no sudo, so the SDK installs into
 # runner.temp — DOTNET_INSTALL_DIR must be on the setup step, not the job (the `runner` context is not
-# available in jobs.<id>.env). Internal-only: no nuget.org step, and the push is NOT continue-on-error.
+# available in jobs.<id>.env). Neither push is continue-on-error: a silent failure is a release that published nothing.
 name: Publish to NuGet
 
 on:
@@ -19,6 +19,11 @@ on:
 jobs:
   plugin:
     runs-on: [self-hosted, x64]
+    # nuget.org is pushed with a TEMPORARY key from Trusted Publishing (OIDC): `id-token: write` lets
+    # NuGet/login mint it; the nuget.org policy names this repository AND this workflow file.
+    permissions:
+      id-token: write
+      contents: read
     timeout-minutes: 30
     env:
       PLUGIN_CSPROJ: src/ModelingEvolution.WeldingMachine.Seeed.Plugin/ModelingEvolution.WeldingMachine.Seeed.Plugin.csproj
@@ -94,3 +99,20 @@ jobs:
           VERSION: ${{ steps.ver.outputs.version }}
           PUSH_OUTCOME: ${{ steps.push.outcome }}
         run: bash ci/verify-feed.sh
+
+      # The repository is public, so the package is too. Our feed first (rw2 installs from it), then
+      # nuget.org. The login comes immediately before the push: the temporary key lives one hour and each
+      # OIDC token buys exactly one key.
+      - name: NuGet login (OIDC -> temporary key)
+        uses: NuGet/login@v1
+        id: nuget-login
+        with:
+          # The POLICY CREATOR's nuget.org username — not the package owner (the ModelingEvolution org).
+          user: rafal.maciag
+
+      - name: Push to NuGet.org
+        run: >
+          dotnet nuget push ./nupkg/*.nupkg
+          --api-key ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
+          --source https://api.nuget.org/v3/index.json
+          --skip-duplicate
