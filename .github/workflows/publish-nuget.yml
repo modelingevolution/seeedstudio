@@ -32,6 +32,14 @@ jobs:
         env:
           DOTNET_INSTALL_DIR: ${{ runner.temp }}/dotnet
 
+      # The runner's /usr/lib/dotnet (SDK 8) can still win on PATH; v1.0.0's first run restored with it and
+      # failed NETSDK1045. Put the SDK setup-dotnet installed first, and say which one is used.
+      - name: Use the installed .NET 10 SDK
+        run: |
+          echo "${{ runner.temp }}/dotnet" >> "$GITHUB_PATH"
+          echo "DOTNET_ROOT=${{ runner.temp }}/dotnet" >> "$GITHUB_ENV"
+          "${{ runner.temp }}/dotnet/dotnet" --version
+
       - name: Version
         id: ver
         run: |
